@@ -2,6 +2,7 @@
 ## httpx client for vertex ai calls
 ## Initial implementation - covers gemini + image gen calls
 import json
+import asyncio
 import time
 from copy import deepcopy
 from functools import partial
@@ -2606,6 +2607,11 @@ class VertexLLM(VertexBase):
             project_id=vertex_project,
             custom_llm_provider=custom_llm_provider,
         )
+        gemini_auth_data = None
+        if custom_llm_provider == "gemini" and gemini_api_key is None:
+            from litellm.llms.gemini.common_utils import get_gemini_oauth_token
+
+            gemini_auth_data = await asyncio.to_thread(get_gemini_oauth_token)
 
         # Extract use_psc_endpoint_format from optional_params
         use_psc_endpoint_format = optional_params.get("use_psc_endpoint_format", False)
@@ -2613,6 +2619,7 @@ class VertexLLM(VertexBase):
         auth_header, api_base = self._get_token_and_url(
             model=model,
             gemini_api_key=gemini_api_key,
+            gemini_auth_data=gemini_auth_data,
             auth_header=_auth_header,
             vertex_project=vertex_project,
             vertex_location=vertex_location,
@@ -2708,6 +2715,11 @@ class VertexLLM(VertexBase):
             project_id=vertex_project,
             custom_llm_provider=custom_llm_provider,
         )
+        gemini_auth_data = None
+        if custom_llm_provider == "gemini" and gemini_api_key is None:
+            from litellm.llms.gemini.common_utils import get_gemini_oauth_token
+
+            gemini_auth_data = await asyncio.to_thread(get_gemini_oauth_token)
 
         # Extract use_psc_endpoint_format from optional_params
         use_psc_endpoint_format = optional_params.get("use_psc_endpoint_format", False)
@@ -2715,6 +2727,7 @@ class VertexLLM(VertexBase):
         auth_header, api_base = self._get_token_and_url(
             model=model,
             gemini_api_key=gemini_api_key,
+            gemini_auth_data=gemini_auth_data,
             auth_header=_auth_header,
             vertex_project=vertex_project,
             vertex_location=vertex_location,
@@ -2903,6 +2916,7 @@ class VertexLLM(VertexBase):
         auth_header, url = self._get_token_and_url(
             model=model,
             gemini_api_key=gemini_api_key,
+            gemini_auth_data=None,
             auth_header=_auth_header,
             vertex_project=vertex_project,
             vertex_location=vertex_location,
