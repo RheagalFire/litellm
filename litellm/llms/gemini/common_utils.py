@@ -367,6 +367,7 @@ class GoogleAIStudioTokenCounter(BaseTokenCounter):
         tools: Optional[List[Dict[str, Any]]] = None,
         system: Optional[Any] = None,
     ) -> Optional[TokenCountResponse]:
+        import asyncio
         import copy
 
         from litellm.llms.gemini.count_tokens.handler import GoogleAIStudioTokenCounter
@@ -375,6 +376,24 @@ class GoogleAIStudioTokenCounter(BaseTokenCounter):
         count_tokens_params_request = copy.deepcopy(
             deployment.get("litellm_params", {})
         )
+
+        # Pre-fetch Gemini OAuth token off the event loop when no API key is set,
+        # so the blocking authenticator.get_token() never runs on the async thread.
+        api_key = count_tokens_params_request.get("api_key") or get_api_key_from_env()
+        if not api_key:
+            gemini_auth_data = await asyncio.to_thread(get_gemini_oauth_token)
+            if gemini_auth_data and gemini_auth_data.get("token"):
+                # Pass OAuth headers as a dict — GoogleGenAIConfig.validate_environment
+                # merges dict api_keys into request headers.
+                oauth_headers: Dict[str, str] = {
+                    "Authorization": f"Bearer {gemini_auth_data['token']}"
+                }
+                if gemini_auth_data.get("project_id"):
+                    oauth_headers["x-goog-user-project"] = gemini_auth_data[
+                        "project_id"
+                    ]
+                count_tokens_params_request["api_key"] = oauth_headers
+
         count_tokens_params = {
             "model": model_to_use,
             "contents": contents,

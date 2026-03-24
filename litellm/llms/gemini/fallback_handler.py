@@ -1,4 +1,4 @@
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any, Awaitable, Callable, Dict, Union
 
 from litellm._logging import verbose_logger
 from litellm.llms.gemini.common_utils import should_fallback_to_google_code_assist
@@ -8,16 +8,22 @@ _google_code_assist_chat = get_google_code_assist_chat()
 
 
 async def run_gemini_acompletion_with_code_assist_fallback(
-    primary_call: Awaitable[Any],
+    primary_call: Union[Awaitable[Any], Callable[[], Awaitable[Any]]],
     fallback_kwargs: Dict[str, Any],
     auto_fallback_to_google_code_assist: bool = False,
 ) -> Any:
     """
     Execute Gemini async completion and fallback to Google Code Assist when
     OAuth scope is insufficient.
+
+    primary_call can be either:
+    - A callable that returns an awaitable (preferred — defers coroutine creation
+      so that exceptions during setup are caught by the fallback handler)
+    - An already-created awaitable (legacy)
     """
     try:
-        return await primary_call
+        coro = primary_call() if callable(primary_call) else primary_call
+        return await coro
     except Exception as e:
         if not auto_fallback_to_google_code_assist:
             raise e

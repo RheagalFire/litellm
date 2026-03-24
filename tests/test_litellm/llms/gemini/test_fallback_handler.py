@@ -73,3 +73,47 @@ async def test_run_gemini_acompletion_with_code_assist_fallback_enabled():
 
         assert result == "fallback-ok"
         mock_acompletion.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_run_gemini_acompletion_callable_primary_call_fallback():
+    """Test that a callable primary_call catches sync-phase exceptions."""
+
+    def _sync_setup_error():
+        raise Exception("ACCESS_TOKEN_SCOPE_INSUFFICIENT")
+
+    with (
+        patch(
+            "litellm.llms.gemini.fallback_handler.should_fallback_to_google_code_assist",
+            return_value=True,
+        ),
+        patch(
+            "litellm.llms.gemini.fallback_handler._google_code_assist_chat.acompletion",
+            new_callable=AsyncMock,
+        ) as mock_acompletion,
+    ):
+        mock_acompletion.return_value = "fallback-ok"
+        result = await run_gemini_acompletion_with_code_assist_fallback(
+            primary_call=_sync_setup_error,  # callable, not awaitable
+            fallback_kwargs={},
+            auto_fallback_to_google_code_assist=True,
+        )
+
+        assert result == "fallback-ok"
+        mock_acompletion.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_run_gemini_acompletion_callable_primary_call_success():
+    """Test that a callable primary_call works for the happy path."""
+
+    async def _async_success():
+        return "primary-ok"
+
+    result = await run_gemini_acompletion_with_code_assist_fallback(
+        primary_call=lambda: _async_success(),
+        fallback_kwargs={},
+        auto_fallback_to_google_code_assist=True,
+    )
+
+    assert result == "primary-ok"
